@@ -223,6 +223,10 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
     process.exit(1);
   }
 
+  // 计算总任务数，用于进度显示
+  const totalTasks = addresses.length * tokens.length * spenders.length;
+  let completedTasks = 0;
+
   for (const address of addresses) {
     logger.debug(`检查地址: ${address}`);
     
@@ -272,6 +276,10 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
         
         for (const spender of spenders) {
           try {
+            // 显示进度
+            completedTasks++;
+            process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}]`);
+            
             // 获取授权金额
             const allowance = await tokenContract.allowance(address, spender);
             
@@ -322,13 +330,24 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
             
           } catch (error) {
             logger.warn(`检查 ${address} 对 ${tokenAddress} 授权给 ${spender} 出错:`, error.message);
+            
+            // 即使出错，也更新进度
+            completedTasks++;
+            process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}]`);
           }
         }
       } catch (error) {
         logger.warn(`处理代币 ${tokenInfo.address} 出错:`, error.message);
+        
+        // 如果处理代币出错，更新该代币的所有spender的进度
+        completedTasks += spenders.length;
+        process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}]`);
       }
     }
   }
+  
+  // 进度完成，换行
+  console.log();
 
   return results;
 }

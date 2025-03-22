@@ -199,6 +199,10 @@ async function findAndCheckApprovals(provider, addresses, tokens, lookbackBlocks
   
   logger.info(`当前区块高度: ${currentBlock}, 将查找从区块 ${startBlock} 开始的授权事件`);
 
+  // 计算总任务数，用于进度显示
+  const totalTasks = tokens.length * addresses.length;
+  let completedTasks = 0;
+
   for (const tokenInfo of tokens) {
     try {
       const tokenAddress = tokenInfo.address;
@@ -237,6 +241,10 @@ async function findAndCheckApprovals(provider, addresses, tokens, lookbackBlocks
       
       // 对每个地址查找授权事件
       for (const address of addresses) {
+        // 显示进度
+        completedTasks++;
+        process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}]`);
+        
         logger.debug(`  查找地址 ${address} 的授权事件`);
         
         // 获取账户余额
@@ -332,8 +340,16 @@ async function findAndCheckApprovals(provider, addresses, tokens, lookbackBlocks
       }
     } catch (error) {
       logger.warn(`处理代币 ${tokenInfo.address} 出错:`, error.message);
+      
+      // 如果处理代币出错，更新该代币的所有地址的进度
+      const remainingAddresses = addresses.length - completedTasks % addresses.length;
+      completedTasks += remainingAddresses;
+      process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}]`);
     }
   }
+  
+  // 进度完成，换行
+  console.log();
 
   return results;
 }
