@@ -1,0 +1,45 @@
+# 依赖目录
+node_modules/
+jspm_packages/
+
+# 日志
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 缓存目录
+.npm
+.eslintcache
+.node_repl_history
+.yarn-integrity
+
+# 生成的输出
+dist/
+build/
+coverage/
+
+# 编辑器目录和文件
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.directory
+Thumbs.db
+
+# 项目特定文件
+report.csv
+*.csv 
+
+data
+.env*

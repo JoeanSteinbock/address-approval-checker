@@ -1,0 +1,20 @@
+# 示例spender合约地址，每行一个
+# 以下是一些常见的交易所和DeFi项目的合约地址
+
+# Uniswap V2 Router
+0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+
+# Uniswap V3 Router
+0xE592427A0AEce92De3Edee1F18E0157C05861564
+
+# SushiSwap Router
+0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F
+
+# 1inch Router
+0x1111111254fb6c44bAC0beD2854e76F90643097d
+
+# OpenSea: Seaport
+0x00000000006c3852cbEf3e08E8dF289169EdE581
+
+# AAVE v2 lending pool
+0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9 
