@@ -15,6 +15,7 @@
   - 显示当前正在处理的操作
   - 即使在长时间查询中也保持更新
 - 支持检查点功能，可以在程序崩溃或中断后恢复进度
+- 支持跳过低价值资产，提高检查效率
 - 输出格式化的报告，便于分析
 - 高级模式：可通过分析历史事件自动发现所有授权对象
 
@@ -22,8 +23,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/address-checker.git
-cd address-checker
+git clone https://github.com/JoeanSteinbock/address-approval-checker.git
+cd address-approval-checker
 
 # 安装依赖
 npm install
@@ -52,6 +53,9 @@ node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt
 # 使用检查点功能（在崩溃或中断后可以恢复进度）
 node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --export report.csv --checkpoint my-checkpoint.json
 
+# 跳过低于指定美元价值的资产（提高处理速度）
+node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --min-value 5
+
 # 方法2：使用npm start（注意参数传递方式）
 npm start -- --address 0x123456... --token 0xabcdef... --spender 0x789abc...
 ```
@@ -77,6 +81,9 @@ node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data
 
 # 使用检查点功能（适用于大量数据处理和长时间运行）
 node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --export report.csv --checkpoint my-advanced-checkpoint.json
+
+# 跳过低价值资产，只检查价值大于10美元的资产
+node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --min-value 10
 ```
 
 ### 文件格式
@@ -132,6 +139,7 @@ spenders.txt（要检查的spender合约地址）:
 - 曝光价值计算依赖于提供的代币价格，若未提供则无法计算
 - 当处理极大数据量（如上万条授权记录）时，程序会自动限制控制台输出，只显示最重要的授权信息，但所有数据都会导出到CSV文件中
 - 对于长时间运行的检查，建议使用检查点功能（`--checkpoint`选项），这样即使程序中断或崩溃，下次运行时也可以从中断处继续，避免已完成的检查重复进行
+- 使用`--min-value`参数可以跳过低价值资产，显著提高检查速度。例如，设置`--min-value 5`将跳过所有余额价值低于5美元的代币检查
 
 ## 常见问题
 
@@ -161,4 +169,8 @@ spenders.txt（要检查的spender合约地址）:
 ```bash
 node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --checkpoint my-checkpoint.json
 ```
-如果程序崩溃，只需再次运行相同命令，它会自动从上次检查点继续。检查完成后，检查点文件会被自动删除。 
+如果程序崩溃，只需再次运行相同命令，它会自动从上次检查点继续。检查完成后，检查点文件会被自动删除。
+
+**问：如何加快处理速度？**
+
+答：使用`--min-value`参数跳过低价值资产是提高速度的最有效方法之一。例如，如果你只关注价值10美元以上的资产，使用`--min-value 10`可以跳过所有低价值代币的检查，大幅减少处理时间。
