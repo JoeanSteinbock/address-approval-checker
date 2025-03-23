@@ -43,6 +43,8 @@ program
   .option('-b, --blocks <number>', '要向前查找的区块数（用于查找Approval事件）', '1000000')
   .option('-e, --export <path>', '导出结果到CSV文件')
   .option('-v, --verbose', '显示详细日志')
+  .option('-c, --checkpoint <path>', '使用检查点文件保存/恢复进度', 'advanced-checkpoint.json')
+  .option('--no-checkpoint', '禁用检查点功能')
   .allowUnknownOption(true); // 允许未知选项，例如--
 
 // 处理参数

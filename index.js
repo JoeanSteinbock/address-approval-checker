@@ -48,6 +48,8 @@ program
   .option('-sf, --spender-file <path>', '包含授权接收者合约地址的文件路径（每行一个地址）')
   .option('-e, --export <path>', '导出结果到CSV文件')
   .option('-v, --verbose', '显示详细日志')
+  .option('-c, --checkpoint <path>', '使用检查点文件保存/恢复进度', 'checkpoint.json')
+  .option('--no-checkpoint', '禁用检查点功能')
   .allowUnknownOption(true); // 允许未知选项，例如--
 
 // 处理参数
@@ -129,6 +131,17 @@ async function main() {
     if (options.export) {
       await exportResults(results, options.export);
       logger.info(`结果已导出到 ${options.export}`);
+    }
+
+    // 检查点完成后删除检查点文件
+    if (options.checkpoint) {
+      try {
+        await fs.access(options.checkpoint);
+        await fs.unlink(options.checkpoint);
+        logger.info(`检查全部完成，已删除检查点文件: ${options.checkpoint}`);
+      } catch (error) {
+        // 文件不存在，忽略错误
+      }
     }
 
   } catch (error) {
@@ -232,6 +245,36 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
   let lastUpdate = startTime;
   let lastProgress = 0;
   
+  // 读取检查点文件（如果存在）
+  let completedChecks = new Set();
+  let savedResults = [];
+  
+  if (options.checkpoint) {
+    try {
+      const checkpointData = await fs.readFile(options.checkpoint, 'utf8');
+      const checkpoint = JSON.parse(checkpointData);
+      completedChecks = new Set(checkpoint.completedChecks || []);
+      savedResults = checkpoint.results || [];
+      completedTasks = completedChecks.size;
+      
+      if (completedTasks > 0) {
+        logger.info(`从检查点恢复，已完成 ${completedTasks} 个任务`);
+        
+        // 将已保存的结果添加到结果数组
+        results.push(...savedResults);
+      }
+    } catch (error) {
+      // 如果文件不存在或无法解析，则使用空的完成任务集
+      logger.debug(`未找到有效的检查点文件或文件解析出错: ${error.message}`);
+      completedChecks = new Set();
+    }
+  }
+  
+  // 最后保存检查点的时间
+  let lastCheckpointTime = Date.now();
+  // 保存检查点的频率 (每30秒)
+  const CHECKPOINT_INTERVAL = 30000; // 毫秒
+  
   // 创建进度更新函数
   const updateProgress = (force = false) => {
     const now = Date.now();
@@ -260,7 +303,30 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
         }
       }
       
-      process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}] ${percent}% 完成 | 预计剩余时间: ${eta}`);
+      process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}] ${percent}% 完成 | 预计剩余时间: ${eta} | 已保存检查点`);
+    }
+    
+    // 定期保存检查点
+    if (options.checkpoint && now - lastCheckpointTime >= CHECKPOINT_INTERVAL) {
+      saveCheckpoint();
+      lastCheckpointTime = now;
+    }
+  };
+  
+  // 保存检查点函数
+  const saveCheckpoint = async () => {
+    if (!options.checkpoint) return;
+    
+    try {
+      const checkpointData = {
+        completedChecks: Array.from(completedChecks),
+        results: results
+      };
+      
+      await fs.writeFile(options.checkpoint, JSON.stringify(checkpointData, null, 2));
+      logger.debug(`已保存检查点，完成任务数: ${completedChecks.size}`);
+    } catch (error) {
+      logger.warn(`保存检查点失败: ${error.message}`);
     }
   };
   
@@ -268,6 +334,11 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
   const progressInterval = setInterval(() => {
     updateProgress();
   }, 1000);
+  
+  // 设置周期性保存检查点的定时器
+  const checkpointInterval = setInterval(() => {
+    saveCheckpoint();
+  }, CHECKPOINT_INTERVAL);
 
   try {
     for (const address of addresses) {
@@ -336,6 +407,15 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
             // 创建一个包含当前批次所有spender的查询任务数组
             const batchTasks = batch.map(async (spender) => {
               try {
+                // 创建该检查的唯一标识
+                const checkId = `${address}_${tokenAddress}_${spender}`;
+                
+                // 如果这个检查已经完成，跳过
+                if (completedChecks.has(checkId)) {
+                  logger.debug(`跳过已完成的检查: ${checkId}`);
+                  return;
+                }
+                
                 process.stdout.write(`\r进度: [${completedTasks}/${totalTasks}] 检查 ${shortenAddress(address)} 对 ${symbol} 授权给 ${shortenAddress(spender)}...`);
                 
                 // 获取授权金额
@@ -386,6 +466,9 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
                   exposedValueUSD: exposedValueUSD
                 });
                 
+                // 标记此检查已完成
+                completedChecks.add(checkId);
+                
               } catch (error) {
                 logger.warn(`检查 ${address} 对 ${tokenAddress} 授权给 ${spender} 出错:`, error.message);
               } finally {
@@ -397,22 +480,60 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
             
             // 并行执行批次内的所有任务
             await Promise.all(batchTasks);
+            
+            // 每个批次完成后保存检查点
+            if (options.checkpoint) {
+              await saveCheckpoint();
+              lastCheckpointTime = Date.now();
+            }
           }
         } catch (error) {
           logger.warn(`处理代币 ${tokenInfo.address} 出错:`, error.message);
           
           // 如果处理代币出错，更新该代币对该地址的所有spender的进度
-          completedTasks += spenders.length;
+          for (const spender of spenders) {
+            const checkId = `${address}_${tokenInfo.address}_${spender}`;
+            if (!completedChecks.has(checkId)) {
+              completedTasks++;
+              completedChecks.add(checkId);
+            }
+          }
+          
           updateProgress(true);
+          
+          // 出错后保存检查点
+          if (options.checkpoint) {
+            await saveCheckpoint();
+            lastCheckpointTime = Date.now();
+          }
         }
       }
+      
+      // 每个地址完成后保存检查点
+      if (options.checkpoint) {
+        await saveCheckpoint();
+        lastCheckpointTime = Date.now();
+      }
     }
+  } catch (error) {
+    // 出现未捕获的错误，尝试保存检查点
+    logger.error('检查授权过程中出现错误:', error);
+    if (options.checkpoint) {
+      await saveCheckpoint();
+    }
+    throw error;
   } finally {
     // 停止进度更新定时器
     clearInterval(progressInterval);
+    clearInterval(checkpointInterval);
     
     // 确保显示最终进度
     process.stdout.write(`\r进度: [${totalTasks}/${totalTasks}] 100% 完成！${' '.repeat(40)}\n`);
+    
+    // 最后再次保存检查点
+    if (options.checkpoint) {
+      await saveCheckpoint();
+    }
   }
 
   return results;

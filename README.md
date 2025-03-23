@@ -14,6 +14,7 @@
   - 提供预计剩余时间
   - 显示当前正在处理的操作
   - 即使在长时间查询中也保持更新
+- 支持检查点功能，可以在程序崩溃或中断后恢复进度
 - 输出格式化的报告，便于分析
 - 高级模式：可通过分析历史事件自动发现所有授权对象
 
@@ -48,6 +49,9 @@ node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt
 # 导出CSV报告
 node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --export report.csv
 
+# 使用检查点功能（在崩溃或中断后可以恢复进度）
+node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --export report.csv --checkpoint my-checkpoint.json
+
 # 方法2：使用npm start（注意参数传递方式）
 npm start -- --address 0x123456... --token 0xabcdef... --spender 0x789abc...
 ```
@@ -70,6 +74,9 @@ node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data
 
 # 导出CSV报告
 node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --export report.csv
+
+# 使用检查点功能（适用于大量数据处理和长时间运行）
+node advanced-checker.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --export report.csv --checkpoint my-advanced-checkpoint.json
 ```
 
 ### 文件格式
@@ -124,6 +131,7 @@ spenders.txt（要检查的spender合约地址）:
 - 在使用高级模式时，建议设置合理的`--blocks`参数，以平衡查询速度和结果完整性
 - 曝光价值计算依赖于提供的代币价格，若未提供则无法计算
 - 当处理极大数据量（如上万条授权记录）时，程序会自动限制控制台输出，只显示最重要的授权信息，但所有数据都会导出到CSV文件中
+- 对于长时间运行的检查，建议使用检查点功能（`--checkpoint`选项），这样即使程序中断或崩溃，下次运行时也可以从中断处继续，避免已完成的检查重复进行
 
 ## 常见问题
 
@@ -145,4 +153,12 @@ spenders.txt（要检查的spender合约地址）:
 
 **问：如何添加更多代币价格？**
 
-答：在tokens.txt文件中按照`合约地址,价格`的格式添加价格信息。对于未提供价格的稳定币，程序会自动设置为1美元。 
+答：在tokens.txt文件中按照`合约地址,价格`的格式添加价格信息。对于未提供价格的稳定币，程序会自动设置为1美元。
+
+**问：程序运行时崩溃或被中断，如何恢复进度？**
+
+答：使用`--checkpoint`选项可以启用检查点功能。程序会定期保存进度到指定的检查点文件，当下次以相同参数运行时，会自动从检查点恢复。例如：
+```bash
+node index.js --address-file ./data/addresses.txt --token-file ./data/tokens.txt --spender-file ./data/spenders.txt --checkpoint my-checkpoint.json
+```
+如果程序崩溃，只需再次运行相同命令，它会自动从上次检查点继续。检查完成后，检查点文件会被自动删除。 
