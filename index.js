@@ -274,6 +274,8 @@ async function checkApprovals(provider, addresses, tokens, spenders) {
   // 最后保存检查点的时间
   let lastCheckpointTime = Date.now();
   // 保存检查点的频率 (每5分钟)
+  // 定义最小价值常量
+  const MIN_VALUE_USD = parseFloat(options.minValue || 1);
   const CHECKPOINT_INTERVAL = 300000; // 毫秒
 
   // 创建进度更新函数
